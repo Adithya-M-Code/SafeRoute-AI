@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../constants/app_constants.dart';
 import 'auth_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -14,6 +17,7 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _controller;
   late final Animation<double> _fade;
   late final Animation<double> _scale;
+  Timer? _navigationTimer;
 
   @override
   void initState() {
@@ -27,7 +31,7 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
     );
     _controller.forward();
-    Future<void>.delayed(const Duration(seconds: 2), () {
+    _navigationTimer = Timer(AppConstants.splashDuration, () {
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, AuthScreen.routeName);
     });
@@ -35,6 +39,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _navigationTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

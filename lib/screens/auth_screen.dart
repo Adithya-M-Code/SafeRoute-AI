@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/app_constants.dart';
 import 'main_shell.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -29,7 +30,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _continueToApp() async {
     setState(() => _isLoading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 900));
+    await Future<void>.delayed(AppConstants.authTransitionDuration);
     if (!mounted) return;
     setState(() => _isLoading = false);
     Navigator.pushReplacementNamed(context, MainShell.routeName);
@@ -62,10 +63,9 @@ class _AuthScreenState extends State<AuthScreen> {
                       Text(
                         'Welcome to SafeRoute AI',
                         textAlign: TextAlign.center,
-                        style:
-                            Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
                       const SizedBox(height: 6),
                       Text(
@@ -119,7 +119,8 @@ class _AuthScreenState extends State<AuthScreen> {
                           prefixIcon: const Icon(Icons.lock_outline_rounded),
                           suffixIcon: IconButton(
                             onPressed: () {
-                              setState(() => _obscurePassword = !_obscurePassword);
+                              setState(
+                                  () => _obscurePassword = !_obscurePassword);
                             },
                             icon: Icon(
                               _obscurePassword
@@ -144,7 +145,8 @@ class _AuthScreenState extends State<AuthScreen> {
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : Text(_isSignup ? 'Create Account' : 'Login'),
                       ),

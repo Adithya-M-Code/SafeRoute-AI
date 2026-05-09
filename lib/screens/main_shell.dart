@@ -8,16 +8,7 @@ import 'risk_heatmap_screen.dart';
 class MainShell extends StatefulWidget {
   static const routeName = '/home';
 
-  final bool isDarkMode;
-  final VoidCallback onToggleTheme;
-
-  const MainShell({
-    super.key,
-    this.isDarkMode = false,
-    this.onToggleTheme = _noop,
-  });
-
-  static void _noop() {}
+  const MainShell({super.key});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -32,10 +23,7 @@ class _MainShellState extends State<MainShell> {
       const HomeDashboardScreen(),
       const MapRouteScreen(embedded: true),
       const RiskHeatmapScreen(),
-      ProfileScreen(
-        isDarkMode: widget.isDarkMode,
-        onToggleTheme: widget.onToggleTheme,
-      ),
+      const ProfileScreen(),
     ];
 
     return Scaffold(

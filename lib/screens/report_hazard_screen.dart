@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/app_constants.dart';
 import '../utils/app_theme.dart';
 
 class ReportHazardScreen extends StatefulWidget {
@@ -34,7 +35,7 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
 
   Future<void> _submitReport() async {
     setState(() => _submitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    await Future<void>.delayed(AppConstants.reportSubmitDelay);
     if (!mounted) return;
     setState(() => _submitting = false);
     await showDialog<void>(
@@ -74,7 +75,8 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
               borderRadius: BorderRadius.circular(18),
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Image picker is mocked in UI.')),
+                  const SnackBar(
+                      content: Text('Image picker is mocked in UI.')),
                 );
               },
               child: Container(

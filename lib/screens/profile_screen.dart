@@ -1,26 +1,23 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../models/hazard_report.dart';
+import '../providers/theme_provider.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 import '../utils/app_theme.dart';
 import '../utils/mock_data.dart';
 
 class ProfileScreen extends StatelessWidget {
-  final bool isDarkMode;
-  final VoidCallback onToggleTheme;
-
-  const ProfileScreen({
-    super.key,
-    required this.isDarkMode,
-    required this.onToggleTheme,
-  });
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final List<dynamic> rawList = jsonDecode(MockData.hazardsJson) as List<dynamic>;
+    final themeMode = context.watch<ThemeProvider>().themeMode;
+    final List<dynamic> rawList =
+        jsonDecode(MockData.hazardsJson) as List<dynamic>;
     final reports = rawList
         .map((item) => HazardReport.fromJson(item as Map<String, dynamic>))
         .toList();
@@ -49,14 +46,17 @@ class ProfileScreen extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                   ),
-                  Text('Safety Contributor', style: Theme.of(context).textTheme.bodySmall),
+                  Text('Safety Contributor',
+                      style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
             IconButton(
-              onPressed: onToggleTheme,
+              onPressed: context.read<ThemeProvider>().toggleTheme,
               icon: Icon(
-                isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                themeMode == ThemeMode.dark
+                    ? Icons.light_mode_rounded
+                    : Icons.dark_mode_rounded,
               ),
             ),
           ],
@@ -112,7 +112,8 @@ class ProfileScreen extends StatelessWidget {
                   title: Text('${report.type} • ${report.location}'),
                   subtitle: Text('${report.status} • ${report.timeAgo}'),
                   trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
                       color: report.riskScore > 0.7
