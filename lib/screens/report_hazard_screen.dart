@@ -1,10 +1,12 @@
-import 'dart:io';
+import 'dart:io' as io;
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import '../models/hazard_report.dart';
 import '../services/image_service_impl.dart';
 import '../services/location_service_impl.dart';
-import '../services/report_service_impl.dart';
+import '../services/report_service.dart';
+import '../services/storage_service.dart';
 import '../utils/app_theme.dart';
 
 class ReportHazardScreen extends StatefulWidget {
@@ -22,7 +24,8 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
   // Services
   late final ImageServiceImpl _imageService;
   late final LocationServiceImpl _locationService;
-  late final ReportServiceImpl _reportService;
+  late final StorageService _storageService;
+  late final ReportService _reportService;
 
   // State variables
   String _selectedHazard = 'Pothole';
@@ -48,8 +51,12 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
     super.initState();
     _imageService = ImageServiceImpl();
     _locationService = LocationServiceImpl();
-    _reportService = ReportServiceImpl();
-    _loadCurrentLocation();
+    _storageService = StorageService();
+    _reportService = ReportService();
+    // Skip location loading on web platform (not supported)
+    if (!kIsWeb) {
+      _loadCurrentLocation();
+    }
   }
 
   @override
@@ -178,26 +185,88 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
       return;
     }
 
+    if (_selectedImagePath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a hazard image before submitting.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _submitting = true);
 
     try {
-      final report = HazardReport(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        type: _selectedHazard,
-        location: _locationName ?? _locationController.text,
-        status: 'pending_validation',
-        timeAgo: 'just now',
-        riskScore: _severity / 5.0,
-        imagePath: _selectedImagePath,
-        latitude: _latitude,
-        longitude: _longitude,
-        locationName: _locationName,
-        description: _descriptionController.text,
-        severity: _severity,
-        anonymous: _anonymous,
-      );
+      // Upload image with 30-second timeout
+      print('\n🖼️ STARTING REPORT SUBMISSION');
+      print('🖼️ Step 1: Uploading image...');
 
-      await _reportService.submitReport(report);
+      String imageUrl = '';
+      try {
+        final uploadFuture =
+            _storageService.uploadImage(io.File(_selectedImagePath!));
+        print('🚀 Image upload task created, waiting...');
+
+        final uploadedUrl = await uploadFuture.timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            print(
+                '⏱️ TIMEOUT: Image upload timed out after 30 seconds - continuing without image');
+            return null;
+          },
+        );
+
+        if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+          imageUrl = uploadedUrl;
+          print('✅ Image uploaded successfully: $imageUrl');
+        } else {
+          print('⚠️ Image upload returned null/empty');
+        }
+      } catch (uploadError) {
+        print('❌ IMAGE UPLOAD ERROR CAUGHT:');
+        print('   Type: ${uploadError.runtimeType}');
+        print('   Message: $uploadError');
+        print('   ⚠️ Continuing without image...');
+        imageUrl = '';
+      }
+
+      // Submit to Firestore with 20-second timeout
+      print('📝 Step 2: Submitting report to Firestore...');
+      try {
+        final submitFuture = _reportService.submitReport(
+          hazardType: _selectedHazard,
+          description: _descriptionController.text,
+          severity: _severity.round(),
+          anonymous: _anonymous,
+          latitude: _latitude!,
+          longitude: _longitude!,
+          locationName: _locationName ?? _locationController.text,
+          imageUrl: imageUrl,
+        );
+
+        await submitFuture.timeout(
+          const Duration(seconds: 20),
+          onTimeout: () {
+            throw TimeoutException(
+                'Firestore submission timed out after 20 seconds');
+          },
+        );
+
+        print('✅ Report submitted successfully!');
+      } catch (e) {
+        print('❌ Firestore error: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Submission failed: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        setState(() => _submitting = false);
+        return;
+      }
 
       if (!mounted) return;
 
@@ -241,6 +310,7 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
         });
       }
     } catch (e) {
+      print('❌ Unexpected error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -250,7 +320,9 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
         );
       }
     } finally {
-      setState(() => _submitting = false);
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
     }
   }
 
@@ -259,7 +331,7 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Report Hazard')),
       body: ListView(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         children: [
           // Image selection card
           Card(
@@ -272,10 +344,17 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
                 child: _selectedImagePath != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.file(
-                          File(_selectedImagePath!),
-                          fit: BoxFit.cover,
-                        ),
+                        child: kIsWeb
+                            ? Container(
+                                color: Colors.grey[300],
+                                child: const Center(
+                                  child: Text('Image selected'),
+                                ),
+                              )
+                            : Image.file(
+                                io.File(_selectedImagePath!),
+                                fit: BoxFit.cover,
+                              ),
                       )
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -300,12 +379,12 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // Location info card
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -323,17 +402,24 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       else
-                        IconButton(
-                          icon: const Icon(Icons.refresh_rounded),
-                          onPressed: _loadCurrentLocation,
-                          iconSize: 20,
+                        SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: IconButton(
+                            icon: const Icon(Icons.refresh_rounded),
+                            onPressed: _loadCurrentLocation,
+                            iconSize: 18,
+                            padding: EdgeInsets.zero,
+                          ),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   TextField(
                     controller: _locationController,
                     readOnly: true,
+                    minLines: 1,
+                    maxLines: 2,
                     decoration: InputDecoration(
                       labelText: 'Location Address',
                       prefixIcon: const Icon(Icons.location_on_outlined),
@@ -342,23 +428,29 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
-                        vertical: 10,
+                        vertical: 12,
                       ),
+                      isDense: true,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   if (_latitude != null && _longitude != null)
-                    Text(
-                      'Coordinates: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[600],
-                          ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(
+                        'Coordinates: ${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.grey[600],
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // Hazard type dropdown
           DropdownButtonFormField<String>(
@@ -383,7 +475,7 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
                     }
                   },
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // Description field
           TextField(
@@ -396,12 +488,12 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
               prefixIcon: Icon(Icons.notes_rounded),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // Severity and anonymous card
           Card(
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -440,7 +532,7 @@ class _ReportHazardScreenState extends State<ReportHazardScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           // Submit button
           FilledButton.icon(
