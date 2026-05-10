@@ -66,5 +66,21 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	
+	<!-- Camera permission -->
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera to capture hazard photos for reporting road issues.</string>
+	
+	<!-- Photo library permission -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to select hazard images for reporting.</string>
+	
+	<!-- Location permission -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to pinpoint hazards on the map for accurate reporting.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>We need your location to pinpoint hazards on the map for accurate reporting.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We need your location to pinpoint hazards on the map for accurate reporting.</string>
 </dict>
 </plist>

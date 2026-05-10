@@ -42,4 +42,14 @@
             <data android:mimeType="text/plain"/>
         </intent>
     </queries>
+
+    <!-- Permissions for camera and photo capture -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    
+    <!-- Permissions for location access -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    
+    <!-- Permission for internet (backend integration later) -->
+    <uses-permission android:name="android.permission.INTERNET" />
 </manifest>
